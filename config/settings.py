@@ -1,45 +1,48 @@
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 class Config:
-    """Application configuration class"""
+    """Configuration class for the application"""
     
-    # Flask Configuration
-    SECRET_KEY = os.getenv('SECRET_KEY', os.urandom(24).hex())
-    DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
-    ENV = os.getenv('FLASK_ENV', 'development')
+    # Database configuration
+    DATABASE_TYPE = os.environ.get('DATABASE_TYPE', 'sqlite')
     
-    # Database Configuration for SQL Server
-    DB_CONFIG = {
-        'driver': os.getenv('DB_DRIVER', 'ODBC Driver 17 for SQL Server'),
-        'server': os.getenv('DB_SERVER'),
-        'database': os.getenv('DB_DATABASE'),
-        'username': os.getenv('DB_USERNAME'),
-        'password': os.getenv('DB_PASSWORD'),
-        'trusted_connection': 'no',
-        'encrypt': 'yes',
-        'trust_server_certificate': 'yes'
-    }
+    # SQLite configuration (for development/small deployments)
+    DATABASE_PATH = os.environ.get('DATABASE_PATH', 'keansa_test.db')
     
-    # Session Configuration
-    SESSION_TYPE = os.getenv('SESSION_TYPE', 'filesystem')
-    SESSION_FILE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'sessions')
-    SESSION_COOKIE_SAMESITE = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
-    SESSION_COOKIE_HTTPONLY = os.getenv('SESSION_COOKIE_HTTPONLY', 'True').lower() == 'true'
-    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
-    PERMANENT_SESSION_LIFETIME = int(os.getenv('PERMANENT_SESSION_LIFETIME', '86400'))
+    # PostgreSQL configuration (for production on Railway)
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    DB_HOST = os.environ.get('DB_HOST', 'localhost')
+    DB_PORT = os.environ.get('DB_PORT', '5432')
+    DB_NAME = os.environ.get('DB_NAME', 'keansa_db')
+    DB_USER = os.environ.get('DB_USER', 'postgres')
+    DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
     
-    # File Upload Configuration
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads')
-    MAX_CONTENT_LENGTH = int(os.getenv('MAX_FILE_SIZE', '16777216'))  # 16MB
-    ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'xlsx,xls,csv,txt,dat').split(','))
+    # Flask configuration
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
     
-    # CORS Configuration
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,http://localhost:5173').split(',')
+    # Session configuration
+    SESSION_TYPE = 'filesystem'
+    SESSION_PERMANENT = True
+    SESSION_USE_SIGNER = True
+    SESSION_FILE_DIR = os.environ.get('SESSION_FILE_DIR', './sessions')
     
-    # User Roles with numeric hierarchy (lower number = higher privilege)
+    # Upload configuration
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', './uploads')
+    MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', str(16 * 1024 * 1024)))  # 16MB
+    
+    # CORS configuration
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
+    
+    # Environment
+    ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+    PORT = int(os.environ.get('PORT', 5000))
+    
+    # User roles hierarchy (lower number = higher privilege)
     USER_ROLES = {
         'SUPER_ADMIN': 1,
         'ADMIN': 2,
@@ -48,26 +51,26 @@ class Config:
         'VIEWER': 5
     }
     
-    # Role Permissions
+    # Role-based permissions
     ROLE_PERMISSIONS = {
         'SUPER_ADMIN': ['*'],  # All permissions
         'ADMIN': [
             'user.create', 'user.read', 'user.update', 'user.delete',
             'template.create', 'template.read', 'template.update', 'template.delete',
             'validation.create', 'validation.read', 'validation.update', 'validation.delete',
-            'file.upload', 'file.download', 'file.process',
+            'file.upload', 'file.download', 'file.delete',
             'role.manage'
         ],
         'MANAGER': [
             'user.read', 'user.update',
             'template.create', 'template.read', 'template.update',
             'validation.create', 'validation.read', 'validation.update',
-            'file.upload', 'file.download', 'file.process'
+            'file.upload', 'file.download'
         ],
         'USER': [
-            'template.read', 'template.create',
+            'template.read',
             'validation.create', 'validation.read',
-            'file.upload', 'file.download', 'file.process'
+            'file.upload', 'file.download'
         ],
         'VIEWER': [
             'template.read',
@@ -75,14 +78,16 @@ class Config:
             'file.download'
         ]
     }
-
-class DevelopmentConfig(Config):
-    """Development configuration"""
-    DEBUG = True
-    ENV = 'development'
-
-class ProductionConfig(Config):
-    """Production configuration"""
-    DEBUG = False
-    ENV = 'production'
-    SESSION_COOKIE_SECURE = True
+    
+    @staticmethod
+    def get_database_url():
+        """Get the appropriate database URL based on environment"""
+        if Config.DATABASE_URL:
+            # Railway provides DATABASE_URL for PostgreSQL
+            return Config.DATABASE_URL
+        elif Config.DATABASE_TYPE.lower() == 'postgresql':
+            # Manual PostgreSQL configuration
+            return f"postgresql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}"
+        else:
+            # SQLite for development
+            return f"sqlite:///{Config.DATABASE_PATH}"
