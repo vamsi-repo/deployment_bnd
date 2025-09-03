@@ -156,3 +156,13 @@ if __name__ == '__main__':
         host='0.0.0.0',
         port=port
     )
+else:
+    # For gunicorn/production - create app instance at module level
+    app = create_app()
+    
+    # Initialize database
+    try:
+        with app.app_context():
+            initialize_database()
+    except Exception as e:
+        logging.warning(f"Database initialization warning during app creation: {e}")
