@@ -1,0 +1,12 @@
+Flask
+Flask-Session
+Flask-CORS
+bcrypt
+pandas
+openpyxl
+paramiko
+numexpr
+numpy
+python-dotenv
+pyodbc
+werkzeug
