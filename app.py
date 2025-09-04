@@ -75,29 +75,48 @@ def create_app():
     @app.route('/api/migrate', methods=['POST'])
     def run_migration():
         try:
-            from database.connection import execute_query
+            from database.connection import execute_query, USE_POSTGRESQL
             
-            # Check if columns already exist
-            check_query = "PRAGMA table_info(login_details)"
-            result = execute_query(check_query, fetch_all=True)
+            # Check if columns already exist (different syntax for PostgreSQL vs SQLite)
+            if USE_POSTGRESQL:
+                check_query = """
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'login_details'
+                """
+                result = execute_query(check_query, fetch_all=True)
+                existing_columns = [row['column_name'] if isinstance(row, dict) else row[0] for row in result]
+            else:
+                check_query = "PRAGMA table_info(login_details)"
+                result = execute_query(check_query, fetch_all=True)
+                existing_columns = [row[1] for row in result]  # Column names are in index 1
             
-            existing_columns = [row[1] for row in result]  # Column names are in index 1
+            logging.info(f"Existing columns: {existing_columns}")
             
             # Add is_approved column if it doesn't exist
             if 'is_approved' not in existing_columns:
-                alter_query = "ALTER TABLE login_details ADD COLUMN is_approved INTEGER DEFAULT 0"
+                if USE_POSTGRESQL:
+                    alter_query = "ALTER TABLE login_details ADD COLUMN is_approved INTEGER DEFAULT 0"
+                else:
+                    alter_query = "ALTER TABLE login_details ADD COLUMN is_approved INTEGER DEFAULT 0"
                 execute_query(alter_query, commit=True)
                 logging.info("Added is_approved column")
             
             # Add approved_by column if it doesn't exist
             if 'approved_by' not in existing_columns:
-                alter_query = "ALTER TABLE login_details ADD COLUMN approved_by INTEGER"
+                if USE_POSTGRESQL:
+                    alter_query = "ALTER TABLE login_details ADD COLUMN approved_by INTEGER"
+                else:
+                    alter_query = "ALTER TABLE login_details ADD COLUMN approved_by INTEGER"
                 execute_query(alter_query, commit=True)
                 logging.info("Added approved_by column")
             
             # Add approved_at column if it doesn't exist
             if 'approved_at' not in existing_columns:
-                alter_query = "ALTER TABLE login_details ADD COLUMN approved_at DATETIME"
+                if USE_POSTGRESQL:
+                    alter_query = "ALTER TABLE login_details ADD COLUMN approved_at TIMESTAMP"
+                else:
+                    alter_query = "ALTER TABLE login_details ADD COLUMN approved_at DATETIME"
                 execute_query(alter_query, commit=True)
                 logging.info("Added approved_at column")
             
