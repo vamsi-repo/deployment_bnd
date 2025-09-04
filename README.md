@@ -1,0 +1,55 @@
+# Keansa Data Validation Backend
+
+## Railway Deployment Instructions
+
+### Prerequisites
+1. Railway account (railway.app)
+2. Railway CLI installed
+3. Git repository
+
+### Environment Variables Required
+
+Set these in Railway dashboard:
+
+```env
+# Database (Railway will auto-provide DATABASE_URL for PostgreSQL)
+DATABASE_TYPE=postgresql
+DATABASE_URL=${DATABASE_URL}
+
+# Flask Configuration
+SECRET_KEY=your-super-secret-key-here-change-this
+DEBUG=false
+ENVIRONMENT=production
+PORT=8080
+
+# Session & Upload Configuration
+SESSION_FILE_DIR=/tmp/sessions
+UPLOAD_FOLDER=/tmp/uploads
+MAX_CONTENT_LENGTH=16777216
+
+# CORS Configuration (Update with your frontend domain)
+CORS_ORIGINS=https://your-frontend-domain.railway.app,http://localhost:3000
+```
+
+### Deployment Commands
+
+```bash
+# Login to Railway
+railway login
+
+# Link to your Railway project
+railway link
+
+# Deploy
+railway up
+```
+
+### Health Check
+- Endpoint: `/api/health`
+- Should return: `{"status": "healthy", "message": "Keansa Data Validation API is running"}`
+
+### Database Migration
+After deployment, run migration:
+```bash
+curl -X POST https://your-backend-domain.railway.app/api/migrate
+```
