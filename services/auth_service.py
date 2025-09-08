@@ -11,11 +11,16 @@ class AuthService:
     def authenticate_user(email, password):
         """Authenticate user login - handles inactive users with proper message"""
         try:
+            from database.connection import USE_POSTGRESQL
+            
+            # Use appropriate parameter placeholder for database type
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
             # First, get user regardless of active status to check if they exist
-            user_query = """
+            user_query = f"""
                 SELECT id, email, first_name, last_name, password, role, is_active, is_approved 
                 FROM login_details 
-                WHERE LOWER(email) = LOWER(?)
+                WHERE LOWER(email) = LOWER({param_placeholder})
             """
             users = get_dict_results(user_query, (email.lower(),))
             
@@ -60,8 +65,11 @@ class AuthService:
     def register_user(user_data):
         """Register a new user"""
         try:
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
             # Check if email already exists
-            check_query = "SELECT COUNT(*) FROM login_details WHERE LOWER(email) = LOWER(?)"
+            check_query = f"SELECT COUNT(*) FROM login_details WHERE LOWER(email) = LOWER({param_placeholder})"
             result = execute_query(check_query, (user_data['email'].lower(),), fetch_one=True)
             
             if result[0] > 0:
@@ -71,10 +79,16 @@ class AuthService:
             hashed_password = bcrypt.hashpw(user_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
             # Insert user with default approval status (0 for pending)
-            insert_query = """
-                INSERT INTO login_details (first_name, last_name, email, mobile, password, role, is_approved)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """
+            if USE_POSTGRESQL:
+                insert_query = """
+                    INSERT INTO login_details (first_name, last_name, email, mobile, password, role, is_approved)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+            else:
+                insert_query = """
+                    INSERT INTO login_details (first_name, last_name, email, mobile, password, role, is_approved)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """
             
             # Admin users are auto-approved, regular users need approval
             role = user_data.get('role', 'USER')
@@ -96,7 +110,7 @@ class AuthService:
             
             # Get the created user
             users = get_dict_results(
-                "SELECT id, email, first_name, last_name, role, is_approved FROM login_details WHERE email = ?",
+                f"SELECT id, email, first_name, last_name, role, is_approved FROM login_details WHERE email = {param_placeholder}",
                 (user_data['email'],)
             )
             
@@ -120,8 +134,11 @@ class AuthService:
     def reset_password(email, new_password):
         """Reset user password"""
         try:
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
             # Check if user exists
-            check_query = "SELECT COUNT(*) FROM login_details WHERE email = ?"
+            check_query = f"SELECT COUNT(*) FROM login_details WHERE email = {param_placeholder}"
             result = execute_query(check_query, (email,), fetch_one=True)
             
             if result[0] == 0:
@@ -130,8 +147,8 @@ class AuthService:
             # Hash new password
             hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
-            # Update password - SQLite compatible
-            update_query = "UPDATE login_details SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE email = ?"
+            # Update password - Compatible with both databases
+            update_query = f"UPDATE login_details SET password = {param_placeholder}, updated_at = CURRENT_TIMESTAMP WHERE email = {param_placeholder}"
             execute_query(update_query, (hashed_password, email), commit=True)
             
             return {'success': True, 'message': 'Password reset successful'}
@@ -144,7 +161,10 @@ class AuthService:
     def update_last_login(user_id):
         """Update user's last login timestamp"""
         try:
-            update_query = "UPDATE login_details SET last_login = CURRENT_TIMESTAMP WHERE id = ?"
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
+            update_query = f"UPDATE login_details SET last_login = CURRENT_TIMESTAMP WHERE id = {param_placeholder}"
             execute_query(update_query, (user_id,), commit=True)
         except Exception as e:
             logging.error(f"Error updating last login: {e}")
@@ -236,11 +256,14 @@ class AuthService:
     def get_user_by_id(user_id):
         """Get user by ID"""
         try:
-            query = """
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
+            query = f"""
                 SELECT id, first_name, last_name, email, mobile, role, is_active, is_approved,
                        created_at, last_login 
                 FROM login_details 
-                WHERE id = ?
+                WHERE id = {param_placeholder}
             """
             users = get_dict_results(query, (user_id,))
             return users[0] if users else None
