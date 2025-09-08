@@ -72,8 +72,25 @@ class AuthService:
             check_query = f"SELECT COUNT(*) FROM login_details WHERE LOWER(email) = LOWER({param_placeholder})"
             result = execute_query(check_query, (user_data['email'].lower(),), fetch_one=True)
             
-            if result[0] > 0:
+            if USE_POSTGRESQL:
+                count = result['count'] if isinstance(result, dict) else result[0]
+            else:
+                count = result[0]
+            
+            if count > 0:
                 return {'success': False, 'message': 'Email already exists'}
+            
+            # Check if mobile already exists
+            mobile_check_query = f"SELECT COUNT(*) FROM login_details WHERE mobile = {param_placeholder}"
+            mobile_result = execute_query(mobile_check_query, (user_data['mobile'],), fetch_one=True)
+            
+            if USE_POSTGRESQL:
+                mobile_count = mobile_result['count'] if isinstance(mobile_result, dict) else mobile_result[0]
+            else:
+                mobile_count = mobile_result[0]
+                
+            if mobile_count > 0:
+                return {'success': False, 'message': 'Mobile number already exists'}
             
             # Hash password
             hashed_password = bcrypt.hashpw(user_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -141,7 +158,12 @@ class AuthService:
             check_query = f"SELECT COUNT(*) FROM login_details WHERE email = {param_placeholder}"
             result = execute_query(check_query, (email,), fetch_one=True)
             
-            if result[0] == 0:
+            if USE_POSTGRESQL:
+                count = result['count'] if isinstance(result, dict) else result[0]
+            else:
+                count = result[0]
+            
+            if count == 0:
                 return {'success': False, 'message': 'Email not found'}
             
             # Hash new password
@@ -204,10 +226,13 @@ class AuthService:
     def approve_user(user_id, approved_by_id):
         """Approve a user"""
         try:
-            update_query = """
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
+            update_query = f"""
                 UPDATE login_details 
-                SET is_approved = 1, approved_by = ?, approved_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+                SET is_approved = 1, approved_by = {param_placeholder}, approved_at = CURRENT_TIMESTAMP
+                WHERE id = {param_placeholder}
             """
             execute_query(update_query, (approved_by_id, user_id), commit=True)
             return {'success': True, 'message': 'User approved successfully'}
@@ -219,11 +244,14 @@ class AuthService:
     def update_user_role(user_id, new_role, updated_by_role):
         """Update user role"""
         try:
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
             # Check if current user can assign this role
             if not AuthService.can_assign_role(updated_by_role, new_role):
                 return {'success': False, 'message': 'Cannot assign this role'}
             
-            update_query = "UPDATE login_details SET role = ? WHERE id = ?"
+            update_query = f"UPDATE login_details SET role = {param_placeholder} WHERE id = {param_placeholder}"
             execute_query(update_query, (new_role, user_id), commit=True)
             return {'success': True, 'message': 'User role updated successfully'}
         except Exception as e:
@@ -234,7 +262,10 @@ class AuthService:
     def deactivate_user(user_id):
         """Deactivate a user"""
         try:
-            update_query = "UPDATE login_details SET is_active = 0 WHERE id = ?"
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
+            update_query = f"UPDATE login_details SET is_active = 0 WHERE id = {param_placeholder}"
             execute_query(update_query, (user_id,), commit=True)
             return {'success': True, 'message': 'User deactivated successfully'}
         except Exception as e:
@@ -245,7 +276,10 @@ class AuthService:
     def activate_user(user_id):
         """Activate a user"""
         try:
-            update_query = "UPDATE login_details SET is_active = 1 WHERE id = ?"
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
+            update_query = f"UPDATE login_details SET is_active = 1 WHERE id = {param_placeholder}"
             execute_query(update_query, (user_id,), commit=True)
             return {'success': True, 'message': 'User activated successfully'}
         except Exception as e:
@@ -293,24 +327,27 @@ class AuthService:
     def update_user(user_id, data):
         """Update user information"""
         try:
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
             # Build update query based on provided data
             update_fields = []
             params = []
             
             if 'first_name' in data:
-                update_fields.append("first_name = ?")
+                update_fields.append(f"first_name = {param_placeholder}")
                 params.append(data['first_name'])
             
             if 'last_name' in data:
-                update_fields.append("last_name = ?")
+                update_fields.append(f"last_name = {param_placeholder}")
                 params.append(data['last_name'])
             
             if 'email' in data:
-                update_fields.append("email = ?")
+                update_fields.append(f"email = {param_placeholder}")
                 params.append(data['email'])
             
             if 'mobile' in data:
-                update_fields.append("mobile = ?")
+                update_fields.append(f"mobile = {param_placeholder}")
                 params.append(data['mobile'])
             
             if not update_fields:
@@ -319,7 +356,7 @@ class AuthService:
             update_fields.append("updated_at = CURRENT_TIMESTAMP")
             params.append(user_id)
             
-            update_query = f"UPDATE login_details SET {', '.join(update_fields)} WHERE id = ?"
+            update_query = f"UPDATE login_details SET {', '.join(update_fields)} WHERE id = {param_placeholder}"
             execute_query(update_query, params, commit=True)
             
             return {'success': True, 'message': 'User updated successfully'}
@@ -331,7 +368,10 @@ class AuthService:
     def delete_user(user_id):
         """Delete user"""
         try:
-            delete_query = "DELETE FROM login_details WHERE id = ?"
+            from database.connection import USE_POSTGRESQL
+            param_placeholder = "%s" if USE_POSTGRESQL else "?"
+            
+            delete_query = f"DELETE FROM login_details WHERE id = {param_placeholder}"
             execute_query(delete_query, (user_id,), commit=True)
             return {'success': True, 'message': 'User deleted successfully'}
         except Exception as e:
